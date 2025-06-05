@@ -19,6 +19,8 @@ import gymnasium
 import torch
 import torch.optim as optim
 
+from tqdm import trange
+
 from RLAlg.alg.ppo import PPO
 from RLAlg.utils import set_seed_everywhere
 from RLAlg.buffer.replay_buffer import ReplayBuffer, compute_gae
@@ -47,12 +49,17 @@ class Trainer:
         self.actor = ActorLearnNet(self.encoder.dim, self.action_dim, [256]).to(self.device)
         self.critic = ValueNet(self.encoder.dim, [256]).to(self.device)
 
+        encoder_params, actor_params, critic_params = torch.load("model.pth")
+        self.encoder.load_state_dict(encoder_params)
+        self.actor.load_state_dict(actor_params)
+        self.critic.load_state_dict(critic_params)
+
         self.optimizer = optim.Adam(
             list(self.encoder.parameters()) + list(self.actor.parameters()) + list(self.critic.parameters()), 
             lr=3e-4
         )
 
-        self.steps = 100
+        self.steps = 50
 
         self.rollout_buffer = ReplayBuffer(self.env_nums, self.steps)
 
@@ -67,7 +74,7 @@ class Trainer:
         
         self.obs = None
 
-        self.epochs = 1000
+        self.epochs = 300
         self.update_iteration = 5
         self.batch_size = self.env_nums * 25
         self.gamma = 0.99
@@ -94,6 +101,10 @@ class Trainer:
         return action, log_prob, value
     
     def rollout(self):
+        self.encoder.eval()
+        self.actor.eval()
+        self.critic.eval()
+
         obs = self.obs
         for i in range(self.steps):
             obs = process_obs(obs)
@@ -129,6 +140,10 @@ class Trainer:
         
         self.rollout_buffer.add_storage("returns", returns)
         self.rollout_buffer.add_storage("advantages", advantages)
+
+        self.encoder.train()
+        self.actor.train()
+        self.critic.train()
 
     def update(self, num_iteration:int, batch_size:int):
         for _ in range(num_iteration):
@@ -168,7 +183,7 @@ class Trainer:
     def train(self):
         obs, info = self.env.reset()
         self.obs = obs
-        for epoch in range(self.epochs):
+        for epoch in trange(self.epochs):
             self.rollout()
             self.update(self.update_iteration, self.batch_size)
 

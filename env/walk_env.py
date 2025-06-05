@@ -61,16 +61,53 @@ class G1WalkEnv(DirectRLEnv):
     
     def _get_rewards(self) -> torch.Tensor:
 
+        rewards = self._height_reward() + self._line_vel_reward() + self._get_action_rate_reward() + self._difference_to_default_reward()
+
+        return rewards
+    
+    def _get_rewards(self) -> torch.Tensor:
+        return (
+            2.0 * self._height_reward() +
+            1.0 * self._no_motion_reward() +
+            -0.5 * self._difference_to_default_reward() +
+            -0.2 * self._get_action_rate_reward() +
+            -0.05 * self._joint_velocity_penalty()
+        )
+
+    def _height_reward(self) -> torch.Tensor:
         base_height = self.robot.data.root_state_w[:, 2]
         height_target = 0.6
-        height_reward = torch.exp(- ((base_height - height_target) ** 2) / 0.01)
 
-        return height_reward
+        # Reward is 1.0 if height is at or above the target
+        reward = torch.where(
+            base_height >= height_target,
+            torch.ones_like(base_height),
+            torch.zeros_like(base_height)
+        )
+        return reward
+
+    def _no_motion_reward(self) -> torch.Tensor:
+        lin_vel = torch.norm(self.robot.data.root_lin_vel_b, dim=1)
+        ang_vel = torch.norm(self.robot.data.root_ang_vel_b, dim=1)
+        penalty = lin_vel**2 + ang_vel**2
+
+        return torch.exp(-penalty / 0.001)
+
+    def _get_action_rate_reward(self) -> torch.Tensor:
+        return torch.sum((self._actions - self._previous_actions) ** 2, dim=1)
     
+    def _joint_velocity_penalty(self) -> torch.Tensor:
+        return torch.norm(self.robot.data.joint_vel, dim=1)
+
+    def _difference_to_default_reward(self) -> torch.Tensor:
+        return torch.sum((self.robot.data.joint_pos - self.robot.data.default_joint_pos) ** 2, dim=1)
+
+            
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
         time_out = self.episode_length_buf >= self.max_episode_length - 1
         base_height = self.robot.data.root_state_w[:, 2]
         terminate = base_height < 0.5
+        #terminate = base_height < 0
         return terminate, time_out
     
     def _reset_idx(self, env_ids: torch.Tensor | None):
