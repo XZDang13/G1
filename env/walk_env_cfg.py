@@ -14,7 +14,7 @@ class G1WalkEnvCfg(DirectRLEnvCfg):
 
     decimation = 4
 
-    observation_space = 82
+    observation_space = 76
     action_space = 23
     state_space = 0
 
