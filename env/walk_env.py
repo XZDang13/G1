@@ -39,18 +39,15 @@ class G1WalkEnv(DirectRLEnv):
 
     def _get_observations(self):
         
-        root_lin_vel = self.robot.data.root_lin_vel_b       # (num_envs, 3)
         root_ang_vel = self.robot.data.root_ang_vel_b       # (num_envs, 3)
-        projected_gravity = self.robot.data.projected_gravity_b  # (num_envs, 3)
         base_orientation = self.robot.data.root_quat_w        # (num_envs, 4)
-        joint_pos = self.robot.data.joint_pos               # (num_envs, 23)
+        joint_pos = self.robot.data.joint_pos - self.robot.data.default_joint_pos # (num_envs, 23)
         joint_vel = self.robot.data.joint_vel               # (num_envs, 23)
         previous_actions = self._previous_actions           # (num_envs, 23)
+        
 
         obs = torch.cat([
-            root_lin_vel,
             root_ang_vel,
-            projected_gravity,
             base_orientation,
             joint_pos,
             joint_vel,
