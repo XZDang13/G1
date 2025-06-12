@@ -74,7 +74,7 @@ class Trainer:
         
         self.obs = None
 
-        self.epochs = 300
+        self.epochs = 600
         self.update_iteration = 5
         self.batch_size = self.env_nums * 25
         self.gamma = 0.99

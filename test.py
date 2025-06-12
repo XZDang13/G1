@@ -45,7 +45,7 @@ class Trainer:
         self.actor = ActorLearnNet(self.encoder.dim, self.action_dim, [256]).to(self.device)
         self.critic = ValueNet(self.encoder.dim, [256]).to(self.device)
 
-        encoder_params, actor_params, _ = torch.load("model.pth")
+        encoder_params, actor_params, _ = torch.load("no_dr_model.pth")
         self.encoder.load_state_dict(encoder_params)
         self.actor.load_state_dict(actor_params)
 
@@ -72,7 +72,7 @@ class Trainer:
         obs = self.obs
         for i in range(self.steps):
             obs = process_obs(obs)
-            action, log_prob, value = self.get_action(obs, False)
+            action, log_prob, value = self.get_action(obs, True)
 
             next_obs, reward, terminate, timeout, info = self.env.step(action)
             
