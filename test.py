@@ -41,11 +41,11 @@ class Trainer:
         self.device = self.env.unwrapped.device
 
 
-        self.encoder = EncoderNet(self.obs_dim, [256, 256]).to(self.device)
-        self.actor = ActorLearnNet(self.encoder.dim, self.action_dim, [256]).to(self.device)
-        self.critic = ValueNet(self.encoder.dim, [256]).to(self.device)
+        self.encoder = EncoderNet(self.obs_dim, [512, 512]).to(self.device)
+        self.actor = ActorLearnNet(self.encoder.dim, self.action_dim, [512]).to(self.device)
+        self.critic = ValueNet(self.encoder.dim, [512]).to(self.device)
 
-        encoder_params, actor_params, _ = torch.load("no_dr_model.pth")
+        encoder_params, actor_params, _ = torch.load("model.pth")
         self.encoder.load_state_dict(encoder_params)
         self.actor.load_state_dict(actor_params)
 

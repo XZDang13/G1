@@ -45,14 +45,14 @@ class Trainer:
         self.device = self.env.unwrapped.device
 
 
-        self.encoder = EncoderNet(self.obs_dim, [256, 256]).to(self.device)
-        self.actor = ActorLearnNet(self.encoder.dim, self.action_dim, [256]).to(self.device)
-        self.critic = ValueNet(self.encoder.dim, [256]).to(self.device)
+        self.encoder = EncoderNet(self.obs_dim, [512, 512]).to(self.device)
+        self.actor = ActorLearnNet(self.encoder.dim, self.action_dim, [512]).to(self.device)
+        self.critic = ValueNet(self.encoder.dim, [512]).to(self.device)
 
-        encoder_params, actor_params, critic_params = torch.load("model.pth")
-        self.encoder.load_state_dict(encoder_params)
-        self.actor.load_state_dict(actor_params)
-        self.critic.load_state_dict(critic_params)
+        #encoder_params, actor_params, critic_params = torch.load("model.pth")
+        #self.encoder.load_state_dict(encoder_params)
+        #self.actor.load_state_dict(actor_params)
+        #self.critic.load_state_dict(critic_params)
 
         self.optimizer = optim.Adam(
             list(self.encoder.parameters()) + list(self.actor.parameters()) + list(self.critic.parameters()), 
@@ -74,16 +74,16 @@ class Trainer:
         
         self.obs = None
 
-        self.epochs = 600
+        self.epochs = 1000
         self.update_iteration = 5
         self.batch_size = self.env_nums * 25
         self.gamma = 0.99
         self.lambda_ = 0.95
-        self.value_loss_weight = 0.5
+        self.value_loss_weight = 1
         self.entropy_weight = 0.01
-        self.max_grad_norm = 0.5
+        self.max_grad_norm = 1
         self.clip_ratio = 0.2
-        self.regularization_weight = 0.0
+        self.regularization_weight = 1e-4
 
         self.desired_kl = 0.01
         self.learning_rate = 1e-3

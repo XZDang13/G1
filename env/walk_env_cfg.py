@@ -47,6 +47,30 @@ class EventCfg:
         },
     )
 
+    reset_base = EventTerm(
+        func=mdp.reset_root_state_uniform,
+        mode="reset",
+        params={
+            "pose_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5), "yaw": (-3.14, 3.14)},
+            "velocity_range": {
+                "x": (0.0, 0.0),
+                "y": (0.0, 0.0),
+                "z": (0.0, 0.0),
+                "roll": (0.0, 0.0),
+                "pitch": (0.0, 0.0),
+                "yaw": (0.0, 0.0),
+            },
+            "asset_cfg": SceneEntityCfg("robot"),
+        },
+    )
+
+    push_robot = EventTerm(
+        func=mdp.push_by_setting_velocity,
+        mode="interval",
+        interval_range_s=(10.0, 15.0),
+        params={"velocity_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5)}},
+    )
+
 @configclass
 class G1WalkEnvCfg(DirectRLEnvCfg):
     episode_length_s = 10.0
@@ -57,7 +81,7 @@ class G1WalkEnvCfg(DirectRLEnvCfg):
     action_space = 23
     state_space = 0
 
-    action_scale = 0.5
+    action_scale = 0.25
 
     early_termination = True
     termination_height = 0.5
@@ -89,10 +113,9 @@ class G1WalkEnvCfg(DirectRLEnvCfg):
     )
 
     scene:InteractiveSceneCfg = InteractiveSceneCfg(
-        num_envs=4096, env_spacing=4.0, replicate_physics=True
+        num_envs=12, env_spacing=4.0, replicate_physics=True
     )
 
     robot:ArticulationCfg = G1_CFG.replace(prim_path="/World/envs/env_.*/Robot")
 
     events: EventCfg = EventCfg()
-

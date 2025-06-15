@@ -38,7 +38,8 @@ class G1WalkEnv(DirectRLEnv):
         self.robot.set_joint_position_target(self._processed_actions)
 
     def _get_observations(self):
-        
+        self._previous_actions = self._actions.clone()
+
         root_ang_vel = self.robot.data.root_ang_vel_b       # (num_envs, 3)
         base_orientation = self.robot.data.root_quat_w        # (num_envs, 4)
         joint_pos = self.robot.data.joint_pos - self.robot.data.default_joint_pos # (num_envs, 23)
@@ -57,15 +58,9 @@ class G1WalkEnv(DirectRLEnv):
         return {"policy": obs}
     
     def _get_rewards(self) -> torch.Tensor:
-
-        rewards = self._height_reward() + self._line_vel_reward() + self._get_action_rate_reward() + self._difference_to_default_reward()
-
-        return rewards
-    
-    def _get_rewards(self) -> torch.Tensor:
         return (
             2.0 * self._height_reward() +
-            1.0 * self._no_motion_reward() +
+            2.0 * self._no_motion_reward() +
             -0.5 * self._difference_to_default_reward() +
             -0.2 * self._get_action_rate_reward() +
             -0.05 * self._joint_velocity_penalty()
@@ -120,9 +115,11 @@ class G1WalkEnv(DirectRLEnv):
        
         joint_pos = self.robot.data.default_joint_pos[env_ids]
         joint_vel = self.robot.data.default_joint_vel[env_ids]
-        default_root_state = self.robot.data.default_root_state[env_ids]
-        default_root_state[:, :3] += self.terrain.env_origins[env_ids]
-        self.robot.write_root_pose_to_sim(default_root_state[:, :7], env_ids)
-        self.robot.write_root_velocity_to_sim(default_root_state[:, 7:], env_ids)
+
+        #default_root_state = self.robot.data.default_root_state[env_ids]
+        #default_root_state[:, :3] += self.terrain.env_origins[env_ids]
+        #self.robot.write_root_pose_to_sim(default_root_state[:, :7], env_ids)
+        #self.robot.write_root_velocity_to_sim(default_root_state[:, 7:], env_ids)
+
         self.robot.write_joint_state_to_sim(joint_pos, joint_vel, None, env_ids)
         
