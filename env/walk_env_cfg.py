@@ -113,7 +113,7 @@ class G1WalkEnvCfg(DirectRLEnvCfg):
     )
 
     scene:InteractiveSceneCfg = InteractiveSceneCfg(
-        num_envs=12, env_spacing=4.0, replicate_physics=True
+        num_envs=4096, env_spacing=4.0, replicate_physics=True
     )
 
     robot:ArticulationCfg = G1_CFG.replace(prim_path="/World/envs/env_.*/Robot")
