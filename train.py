@@ -74,14 +74,14 @@ class Trainer:
         
         self.obs = None
 
-        self.epochs = 1000
+        self.epochs = 2000
         self.update_iteration = 5
-        self.batch_size = self.env_nums * 25
+        self.batch_size = self.env_nums * 10
         self.gamma = 0.99
         self.lambda_ = 0.95
-        self.value_loss_weight = 1
+        self.value_loss_weight = 0.5
         self.entropy_weight = 0.01
-        self.max_grad_norm = 1
+        self.max_grad_norm = 0.5
         self.clip_ratio = 0.2
         self.regularization_weight = 1e-4
 

@@ -13,8 +13,10 @@ class G1WalkEnv(DirectRLEnv):
     def __init__(self, cfg, render_mode = None, **kwargs):
         super().__init__(cfg, render_mode, **kwargs)
 
-        self._actions = torch.zeros(self.num_envs, 23, device=self.device)
-        self._previous_actions = torch.zeros(self.num_envs, 23, device=self.device)
+        self.commands_scale = torch.tensor([1.0, 0.5, 1.0], device=self.device)
+        self.commands = torch.zeros(self.num_envs, 3, device=self.device)
+        self.actions = torch.zeros(self.num_envs, 23, device=self.device)
+        self.previous_actions = torch.zeros(self.num_envs, 23, device=self.device)
 
     def _setup_scene(self):
         self.robot = Articulation(self.cfg.robot)
@@ -31,21 +33,31 @@ class G1WalkEnv(DirectRLEnv):
         light_cfg.func("/World/Light", light_cfg)
 
     def _pre_physics_step(self, actions: torch.Tensor):
-        self._actions = actions.clone()
-        self._processed_actions = self.cfg.action_scale * self._actions + self.robot.data.default_joint_pos
+        self.actions = actions.clone()
+        self.processed_actions = self.cfg.action_scale * self.actions + self.robot.data.default_joint_pos
 
     def _apply_action(self):
-        self.robot.set_joint_position_target(self._processed_actions)
+        self.robot.set_joint_position_target(self.processed_actions)
 
     def _get_observations(self):
-        self._previous_actions = self._actions.clone()
+        self.previous_actions = self.actions.clone()
 
-        root_ang_vel = self.robot.data.root_ang_vel_b       # (num_envs, 3)
-        base_orientation = self.robot.data.root_quat_w        # (num_envs, 4)
+        root_ang_vel = self.robot.data.root_ang_vel_b        # (num_envs, 3)
+        base_orientation = self.robot.data.projected_gravity_b        # (num_envs, 3)
         joint_pos = self.robot.data.joint_pos - self.robot.data.default_joint_pos # (num_envs, 23)
         joint_vel = self.robot.data.joint_vel               # (num_envs, 23)
-        previous_actions = self._previous_actions           # (num_envs, 23)
-        
+        previous_actions = self.previous_actions           # (num_envs, 23)
+
+        root_ang_vel_noise = torch.rand_like(root_ang_vel) * 0.1
+        base_orientation_noise = torch.rand_like(base_orientation)
+        joint_pos_noise = torch.rand_like(joint_pos)
+        joint_vel_noise = torch.rand_like(joint_vel)
+
+        if self.cfg.training:
+            root_ang_vel += root_ang_vel_noise
+            base_orientation += base_orientation_noise
+            joint_pos += joint_pos_noise
+            joint_vel += joint_vel_noise
 
         obs = torch.cat([
             root_ang_vel,
@@ -53,17 +65,20 @@ class G1WalkEnv(DirectRLEnv):
             joint_pos,
             joint_vel,
             previous_actions,
+            self.commands
         ], dim=-1)
 
         return {"policy": obs}
     
     def _get_rewards(self) -> torch.Tensor:
         return (
-            2.0 * self._height_reward() +
-            2.0 * self._no_motion_reward() +
-            -0.5 * self._difference_to_default_reward() +
-            -0.2 * self._get_action_rate_reward() +
-            -0.05 * self._joint_velocity_penalty()
+            1.0 * self._height_reward() +
+            2.0 * self._xy_velocity_reward() +
+            2.0 * self._yaw_angel_velocity_reward() +
+            -1.0 * self._z_velocity_reward() +
+            -0.1 * self._difference_to_default_reward() +
+            -0.01 * self._get_action_rate_reward() +
+            -0.01 * self._joint_velocity_penalty()
         )
 
     def _height_reward(self) -> torch.Tensor:
@@ -78,23 +93,34 @@ class G1WalkEnv(DirectRLEnv):
         )
         return reward
 
-    def _no_motion_reward(self) -> torch.Tensor:
-        lin_vel = torch.norm(self.robot.data.root_lin_vel_b, dim=1)
-        ang_vel = torch.norm(self.robot.data.root_ang_vel_b, dim=1)
-        penalty = lin_vel**2 + ang_vel**2
+    def _xy_velocity_reward(self) -> torch.Tensor:
+        xy_velocity = self.robot.data.root_lin_vel_b[:, :2]
+        target_xy_velocity = self.commands[:, :2]
 
-        return torch.exp(-penalty / 0.001)
+        error = torch.sum(torch.square(target_xy_velocity - xy_velocity), dim=1)
+        return torch.exp(-error / 0.25)
+    
+    def _yaw_angel_velocity_reward(self) -> torch.Tensor:
+        yaw_angle_velocity = self.robot.data.root_ang_vel_b[:, 2]
+        target_yaw_angle_velocity = self.commands[:, 2]
+
+        error = torch.square(target_yaw_angle_velocity - yaw_angle_velocity)
+        return torch.exp(-error / 0.25)
+    
+    def _z_velocity_reward(self) -> torch.Tensor:
+        z_velocity = self.robot.data.root_lin_vel_b[:, 2]
+
+        return torch.square(z_velocity)
 
     def _get_action_rate_reward(self) -> torch.Tensor:
-        return torch.sum((self._actions - self._previous_actions) ** 2, dim=1)
+        return torch.sum((self.actions - self.previous_actions) ** 2, dim=1)
     
     def _joint_velocity_penalty(self) -> torch.Tensor:
         return torch.norm(self.robot.data.joint_vel, dim=1)
 
     def _difference_to_default_reward(self) -> torch.Tensor:
         return torch.sum((self.robot.data.joint_pos - self.robot.data.default_joint_pos) ** 2, dim=1)
-
-            
+     
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
         time_out = self.episode_length_buf >= self.max_episode_length - 1
         base_height = self.robot.data.root_state_w[:, 2]
@@ -110,9 +136,10 @@ class G1WalkEnv(DirectRLEnv):
         if len(env_ids) == self.num_envs:
             # Spread out the resets to avoid spikes in training when many environments reset at a similar time
             self.episode_length_buf[:] = torch.randint_like(self.episode_length_buf, high=int(self.max_episode_length))
-        self._actions[env_ids] = 0.0
-        self._previous_actions[env_ids] = 0.0
-       
+        self.actions[env_ids] = 0.0
+        self.previous_actions[env_ids] = 0.0
+        self.commands[env_ids] = torch.zeros_like(self.commands[env_ids]).uniform_(-1.0, 1.0)
+        #self.commands[env_ids] *= self.commands_scale
         joint_pos = self.robot.data.default_joint_pos[env_ids]
         joint_vel = self.robot.data.default_joint_vel[env_ids]
 
@@ -122,4 +149,3 @@ class G1WalkEnv(DirectRLEnv):
         #self.robot.write_root_velocity_to_sim(default_root_state[:, 7:], env_ids)
 
         self.robot.write_joint_state_to_sim(joint_pos, joint_vel, None, env_ids)
-        

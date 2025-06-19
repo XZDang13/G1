@@ -85,7 +85,7 @@ class Trainer:
 
     def test(self):
         obs, info = self.env.reset()
-        print(self.env.unwrapped.robot.data.joint_names)
+        print(obs)
         self.obs = obs
         for epoch in range(10):
             self.rollout()

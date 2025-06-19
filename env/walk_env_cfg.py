@@ -20,8 +20,8 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=".*"),
-            "static_friction_range": (0.8, 0.8),
-            "dynamic_friction_range": (0.6, 0.6),
+            "static_friction_range": (0.4, 1.0),
+            "dynamic_friction_range": (0.2, 1.0),
             "restitution_range": (0.0, 0.0),
             "num_buckets": 64,
         },
@@ -32,7 +32,7 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names="torso_link"),
-            "mass_distribution_params": (-2.5, 2.5),
+            "mass_distribution_params": (-2.5, 4.0),
             "operation": "add",
         },
     )
@@ -42,7 +42,7 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names="pelvis"),
-            "mass_distribution_params": (-1.0, 1.0),
+            "mass_distribution_params": (-1.0, 2.0),
             "operation": "add",
         },
     )
@@ -64,12 +64,12 @@ class EventCfg:
         },
     )
 
-    push_robot = EventTerm(
-        func=mdp.push_by_setting_velocity,
-        mode="interval",
-        interval_range_s=(10.0, 15.0),
-        params={"velocity_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5)}},
-    )
+    #push_robot = EventTerm(
+    #    func=mdp.push_by_setting_velocity,
+    #    mode="interval",
+    #    interval_range_s=(10.0, 15.0),
+    #    params={"velocity_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5)}},
+    #)
 
 @configclass
 class G1WalkEnvCfg(DirectRLEnvCfg):
@@ -77,7 +77,7 @@ class G1WalkEnvCfg(DirectRLEnvCfg):
 
     decimation = 4
 
-    observation_space = 76
+    observation_space = 78
     action_space = 23
     state_space = 0
 
@@ -85,6 +85,8 @@ class G1WalkEnvCfg(DirectRLEnvCfg):
 
     early_termination = True
     termination_height = 0.5
+
+    training = False
 
     sim: SimulationCfg = SimulationCfg(
         dt=1 / 200,
@@ -113,9 +115,10 @@ class G1WalkEnvCfg(DirectRLEnvCfg):
     )
 
     scene:InteractiveSceneCfg = InteractiveSceneCfg(
-        num_envs=4096, env_spacing=4.0, replicate_physics=True
+        num_envs=12, env_spacing=4.0, replicate_physics=True
     )
 
     robot:ArticulationCfg = G1_CFG.replace(prim_path="/World/envs/env_.*/Robot")
 
     events: EventCfg = EventCfg()
+
